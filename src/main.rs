@@ -1,3 +1,4 @@
+
 use git2::build::CheckoutBuilder;
 use git2::{FetchOptions, RemoteCallbacks};
 use git2::{build::RepoBuilder, Repository};
@@ -13,7 +14,7 @@ const LOCAL_PATH: &str = "nlab_mirror";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let path = Path::new(LOCAL_PATH);
-    let repo = update_local_repository(path)?;
+    let _repo = update_local_repository(path)?;
 
     if path.exists() {
         let indexed_data = index_local_files(path)?;
@@ -36,15 +37,27 @@ fn update_local_repository(path: &Path) -> Result<Repository, git2::Error> {
         println!("本地仓库已存在，正在更新...");
         let repo = Repository::open(path)?;
         
-        // --- 1. 执行 FETCH (获取远程最新状态) ---
+        // 1. 执行 FETCH (获取远程最新状态)
         {
             let mut remote = repo.find_remote("origin")?;
+            
+            // 为 fetch 添加 sideband_progress 回调
+            let mut callbacks = RemoteCallbacks::new();
+            callbacks.sideband_progress(|data| {
+                print!("\r远程: {}", String::from_utf8_lossy(data));
+                std::io::stdout().flush().unwrap();
+                true
+            });
+
             let mut fetch_options = FetchOptions::new();
-            // 可以复用 clone_with_progress 中的回调函数，这里简化处理
+            fetch_options.remote_callbacks(callbacks);
+
+            // 使用带有回调的 fetch_options
             remote.fetch::<&str>(&[], Some(&mut fetch_options), None)?;
+            println!(); // fetch 进度打印完成后换行
         }
         
-        // --- 2. 获取 FETCH_HEAD 并分析合并类型 ---
+        // 2. 获取 FETCH_HEAD 并分析合并类型
         let (analysis, oid) = {
             let fetch_head = repo.find_reference("FETCH_HEAD")?;
             let oid = fetch_head.target().unwrap();
@@ -57,25 +70,28 @@ fn update_local_repository(path: &Path) -> Result<Repository, git2::Error> {
         } else if analysis.0.is_fast_forward() {
             println!("正在执行快进合并...");
 
-            // 4. 执行快进合并
-            let reference_name = "refs/heads/main";
-            let mut reference = repo.find_reference(reference_name)?;
+            // 3. 执行快进合并
+            // 获取 HEAD 指向的引用 (例如 refs/heads/main)
+            let mut reference = repo.head()?.resolve()?;
+            
+            // 获取该引用的名称，用于后续操作
+            let ref_name = reference.name().ok_or_else(|| 
+                git2::Error::new(git2::ErrorCode::InvalidSpec, git2::ErrorClass::Reference, "无法获取 HEAD 引用的名称")
+            )?.to_string();
 
-            // 更新本地分支引用到远程最新的 OID
-            reference.set_target(oid, "Fast-Forward Merge")?;
+            println!("正在快进本地引用: {}", ref_name);
 
-            // 移动 HEAD 指针
-            repo.set_head(reference_name)?;
+            // 将该引用直接指向 fetch 下来的 commit (oid)
+            reference.set_target(oid, "Fast-Forward")?;
 
-            // 检出新的提交内容到工作目录
-            let mut checkout_builder = CheckoutBuilder::new();
-            checkout_builder.recreate_missing(true).force();
-            repo.checkout_head(Some(&mut checkout_builder))?;
+            // 更新 HEAD 指向，并检出工作目录以匹配
+            repo.set_head(&ref_name)?;
+            repo.checkout_head(Some(CheckoutBuilder::new().force()))?;
 
             println!("更新完成。");
 
         } else if analysis.0.is_normal() {
-             // 如果是普通合并（需要产生一个新的合并提交），逻辑会复杂得多
+            // 如果是普通合并（需要产生一个新的合并提交），逻辑会复杂得多
             println!("发现需要普通合并的情况，请手动处理或使用更复杂的合并逻辑。");
         } else {
             println!("发现复杂或不可处理的 Git 状态。");
@@ -83,7 +99,7 @@ fn update_local_repository(path: &Path) -> Result<Repository, git2::Error> {
 
         Ok(repo)
     } else {
-        // --- 路径不存在：执行克隆 (Clone) 操作 ---
+        // 路径不存在：执行克隆 (Clone) 操作
         println!("本地仓库不存在，正在克隆...");
         let repo = clone_with_progress(REPO_URL, path)?;
         println!("克隆完成。");
@@ -93,16 +109,10 @@ fn update_local_repository(path: &Path) -> Result<Repository, git2::Error> {
 
 fn clone_with_progress(url: &str, path: &Path) -> Result<Repository, git2::Error> {
     let mut callbacks = RemoteCallbacks::new();
-    let mut last_printed = 0;
-    callbacks.transfer_progress(|stats| {
-        let received = stats.received_objects();
-        if stats.received_objects() == stats.total_objects() {
-            // 使用 \r 可以在同一行更新进度，提高用户体验
-            print!("\r接收完成：{}/{}", stats.received_objects(), stats.total_objects());
-        } else if received - last_printed >= 1000 || received == 1 {
-            print!("\r接收中：{}/{} ({})", stats.received_objects(), stats.total_objects(), stats.indexed_deltas());
-            last_printed = received;
-        }
+    
+    // 使用 sideband_progress 来实时显示下载进度
+    callbacks.sideband_progress(|data| {
+        print!("\r远程: {}", String::from_utf8_lossy(data));
         std::io::stdout().flush().unwrap();
         true
     });
@@ -110,10 +120,9 @@ fn clone_with_progress(url: &str, path: &Path) -> Result<Repository, git2::Error
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks);
 
-    let mut checkout_options = CheckoutBuilder::new();
     let mut checkout_last_printed = 0;
+    let mut checkout_options = CheckoutBuilder::new();
     checkout_options.progress(|_path, completed_steps, total_steps| {
-        // ... (进度打印逻辑) ...
         if total_steps > 0 && (completed_steps - checkout_last_printed >= 1000 || completed_steps == total_steps) {
             print!("\r检出：{}/{}", completed_steps, total_steps);
             checkout_last_printed = completed_steps;
@@ -125,7 +134,19 @@ fn clone_with_progress(url: &str, path: &Path) -> Result<Repository, git2::Error
     builder.fetch_options(fetch_options);
     builder.with_checkout(checkout_options);
 
-    builder.clone(url, path)
+    let repo = builder.clone(url, path)?;
+
+    // 确保克隆后处于健康的分支状态
+    {
+        // 找到远程 HEAD 指向的提交
+        let head_commit = repo.head()?.peel_to_commit()?;
+        // 在该提交上创建本地 'master' 分支
+        repo.branch("master", &head_commit, false)?;
+        // 将 HEAD 指向新创建的 'master' 分支
+        repo.set_head("refs/heads/master")?;
+    }
+
+    Ok(repo)
 }
 
 // 定义一个结构体来存储提取到的数据
@@ -141,52 +162,63 @@ fn index_local_files(repo_path: &Path) -> Result<Vec<NLabPage>, Box<dyn Error>> 
     let mut pages: Vec<NLabPage> = Vec::new();
     let mut parsed_count = 0;
 
-    // 1. 定义我们需要的 CSS 选择器
-    // 注意：Selector::parse() 应该只被调用一次，以避免重复工作
-    let title_selector = Selector::parse("h1").unwrap();
-    let content_selector = Selector::parse("#content").unwrap();
+    // 定义我们需要的 CSS 选择器
+    // 标题在 h1#pageName 中，但我们只需要 span.webName 之后的文本
+    let page_name_selector = Selector::parse("h1#pageName").unwrap();
+    // 实际内容在 div#revision 中
+    let content_selector = Selector::parse("div#revision").unwrap();
 
-    // 2. 使用 WalkDir 遍历目录
-    for entry in WalkDir::new(repo_path) {
-        let entry = entry?;
+    // 使用 WalkDir 遍历目录
+    for entry in WalkDir::new(repo_path).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
 
-        // 3. 过滤出 .html 文件
+        // 过滤出 .html 文件
         if path.is_file() && path.extension().map_or(false, |ext| ext == "html") {
-            // 获取文件名作为页面的唯一标识（例如：HomePage.html）
-            let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+            // 获取相对于仓库根目录的路径，用于日志和标识
+            let relative_path = path.strip_prefix(repo_path).unwrap().to_string_lossy();
 
-            // 4. 读取文件内容
+            // 读取文件内容
             let html_content = fs::read_to_string(path)?;
 
-            // 5. 使用 scraper 解析 HTML
+            // 使用 scraper 解析 HTML
             let document = Html::parse_document(&html_content);
             
-            // 6. 提取数据
-            
-            // 提取标题：找到第一个 h1 标签
+            // 提取标题：从 h1#pageName 中提取，跳过 span.webName
             let title = document
-                .select(&title_selector)
+                .select(&page_name_selector)
                 .next()
-                .map(|h1| h1.text().collect::<String>()) // 提取标签内的文本
-                .unwrap_or_else(|| "Untitled Page".to_string()); // 提供默认值以防找不到
+                .map(|h1| {
+                    // 获取所有文本节点
+                    let full_text: String = h1.text().collect();
+                    // 移除 "nLab" 前缀和多余空白
+                    full_text
+                        .replace("nLab", "")
+                        .trim()
+                        .to_string()
+                })
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "Untitled Page".to_string());
 
-            // 提取内容：找到 #content 区域
+            // 提取内容：找到 div#revision 区域
             let content_div = document
                 .select(&content_selector)
                 .next();
 
             let content = if let Some(div) = content_div {
-                // 提取整个 content div 中的所有文本，并去除多余空白
-                div.text().collect::<String>().trim().to_string()
+                // 提取整个 revision div 中的所有文本，并去除多余空白
+                div.text()
+                    .collect::<String>()
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ")
             } else {
-                eprintln!("警告：文件 {} 未找到核心内容。", file_name);
-                "".to_string()
+                eprintln!("警告：文件 {} 未找到核心内容。", relative_path);
+                String::new()
             };
 
-            // 7. 存储结果
+            // 存储结果
             pages.push(NLabPage {
-                file_path: file_name,
+                file_path: relative_path.to_string(),
                 title,
                 content,
             });
