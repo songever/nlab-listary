@@ -1,4 +1,3 @@
-
 use crate::models::NLabPage;
 use scraper::{Html, Selector};
 use std::fs;
@@ -67,15 +66,15 @@ pub fn index_local_files(repo_path: &Path) -> Result<Vec<NLabPage>, ParseHtmlErr
 
     println!("--- 解析完成! ---");
     println!("成功处理: {} 个文件", parsed_count);
-    
+
     if skipped_count > 0 {
-        println!("跳过: {} 个文件", skipped_count);
-        println!("\n跳过的文件列表:");
+        println!("跳过: {skipped_count} 个文件\n");
+        println!("跳过的文件列表:");
         for (path, error) in &skipped_files {
             println!("  - {}: {}", path.display(), error);
         }
     }
-    
+
     Ok(pages)
 }
 
@@ -85,10 +84,11 @@ fn parse_html_file(file_path: &Path, repo_path: &Path) -> Result<Option<NLabPage
         .to_string_lossy()
         .to_string();
 
-    let html_content = fs::read_to_string(file_path).map_err(|e| ParseHtmlError::FileReadError {
-        path: file_path.to_path_buf(),
-        source: e,
-    })?;
+    let html_content =
+        fs::read_to_string(file_path).map_err(|e| ParseHtmlError::FileReadError {
+            path: file_path.to_path_buf(),
+            source: e,
+        })?;
     let document = Html::parse_document(&html_content);
 
     // 提取标题
@@ -203,7 +203,7 @@ mod tests {
             match fs::read_to_string(&path) {
                 Ok(html_content) => {
                     let document = Html::parse_document(&html_content);
-                    
+
                     match extract_url(&document) {
                         Ok(url) => {
                             successful_extractions += 1;
@@ -278,7 +278,7 @@ mod tests {
     #[test]
     fn test_inspect_failed_file() {
         let path = Path::new("nlab_mirror/pages/3/9/5/2/2593/content.html");
-        
+
         if !path.exists() {
             println!("File does not exist, skipping test");
             return;
@@ -290,9 +290,9 @@ mod tests {
         // 尝试查找 edit 链接
         let edit_link_selector = Selector::parse("a#edit").unwrap();
         let edit_link = document.select(&edit_link_selector).next();
-        
+
         println!("Edit link found: {}", edit_link.is_some());
-        
+
         if let Some(link) = edit_link {
             println!("Edit link HTML: {:?}", link.html());
             println!("Edit link href: {:?}", link.value().attr("href"));
@@ -301,8 +301,9 @@ mod tests {
             let all_links_selector = Selector::parse("a").unwrap();
             println!("\nAll links in the document:");
             for (i, link) in document.select(&all_links_selector).enumerate().take(10) {
-                println!("Link {}: id={:?}, href={:?}", 
-                    i, 
+                println!(
+                    "Link {}: id={:?}, href={:?}",
+                    i,
                     link.value().attr("id"),
                     link.value().attr("href")
                 );
@@ -312,10 +313,16 @@ mod tests {
         // 检查文件的整体结构
         println!("\nDocument structure:");
         let title = extract_title(&document);
-        println!("Title: {}", if title.is_empty() { "(empty)" } else { &title });
-        
+        println!(
+            "Title: {}",
+            if title.is_empty() { "(empty)" } else { &title }
+        );
+
         let content = extract_content(&document);
         println!("Content length: {} chars", content.len());
-        println!("Content preview: {}", &content.chars().take(200).collect::<String>());
+        println!(
+            "Content preview: {}",
+            &content.chars().take(200).collect::<String>()
+        );
     }
 }
