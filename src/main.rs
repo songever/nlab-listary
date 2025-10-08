@@ -1,8 +1,8 @@
+use nlab_listary_demo::LOCAL_PATH;
 use nlab_listary_demo::git_ops::update_local_repository;
 use nlab_listary_demo::parser::index_local_files;
 use std::error::Error;
 use std::path::Path;
-use nlab_listary_demo::{LOCAL_PATH};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let path = Path::new(LOCAL_PATH);

@@ -1,9 +1,9 @@
+use super::REPO_URL;
 use git2::build::CheckoutBuilder;
 use git2::{FetchOptions, RemoteCallbacks};
 use git2::{Repository, build::RepoBuilder};
 use std::io::Write;
 use std::path::Path;
-use super::{REPO_URL};
 
 pub fn update_local_repository(path: &Path) -> Result<Repository, git2::Error> {
     if path.exists() {
