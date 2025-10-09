@@ -78,7 +78,10 @@ pub fn index_local_files(repo_path: &Path) -> Result<Vec<NLabPage>, ParseHtmlErr
     Ok(pages)
 }
 
-pub fn parse_html_file(file_path: &Path, repo_path: &Path) -> Result<Option<NLabPage>, ParseHtmlError> {
+pub fn parse_html_file(
+    file_path: &Path,
+    repo_path: &Path,
+) -> Result<Option<NLabPage>, ParseHtmlError> {
     let relative_path = file_path
         .strip_prefix(repo_path)?
         .to_string_lossy()

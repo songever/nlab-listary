@@ -1,4 +1,3 @@
-
 use nlab_listary_demo::LOCAL_PATH;
 use nlab_listary_demo::browser::open_url;
 use nlab_listary_demo::git_ops::update_local_repository;
@@ -24,16 +23,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 "内容片段: {}...",
                 page.content.chars().take(100).collect::<String>()
             );
-            
+
             // 测试 open_url 函数
             println!("正在浏览器中打开: {}", page.url);
             match open_url(&page.url) {
                 Ok(()) => println!("✓ 成功打开页面"),
                 Err(e) => eprintln!("✗ 打开页面失败: {}", e),
             }
-            
+
             println!("---");
-            
+
             // 添加短暂延迟，避免同时打开太多标签页
             std::thread::sleep(std::time::Duration::from_secs(2));
         }

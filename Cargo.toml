@@ -11,6 +11,7 @@ open = "5.3.2"
 scraper = "0.24.0"
 serde = { version = "1.0.228", features = ["derive"] }
 sled = "0.34.7"
+tantivy = "0.25.0"
 thiserror = "2.0.17"
 walkdir = "2.5.0"
 

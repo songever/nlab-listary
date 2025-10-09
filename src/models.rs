@@ -1,4 +1,4 @@
-use bincode::{Encode, Decode};
+use bincode::{Decode, Encode};
 // 定义一个结构体来存储提取到的数据
 #[derive(Debug, Encode, Decode, Clone)]
 pub struct NLabPage {
@@ -7,9 +7,9 @@ pub struct NLabPage {
     pub title: String,
     /// 文件相对于仓库根目录的路径
     pub file_path: String,
-    
+
     pub url: String,
-    
+
     /// 页面的文本内容（已清理格式）
     pub content: String,
 }
