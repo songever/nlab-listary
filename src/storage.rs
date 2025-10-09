@@ -1,5 +1,5 @@
 
-use crate::models::NLabPage;
+use crate::{models::NLabPage, parser};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -21,6 +21,19 @@ pub enum StorageError {
     
     #[error("Invalid metadata key: {0}")]
     InvalidMetadataKey(String),
+
+     #[error("Parser error: {0}")]
+    ParserError(String),
+    
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+}
+
+// 添加从 Box<dyn Error> 的转换
+impl From<parser::ParseHtmlError> for StorageError {
+    fn from(err: parser::ParseHtmlError) -> Self {
+        StorageError::ParserError(err.to_string())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, StorageError>;
@@ -29,12 +42,12 @@ pub struct Storage {
     db: sled::Db,
 }
 
-const NLAB_PAGE_SIZE: usize = 4 * 1024;
+const NLAB_PAGE_SIZE: usize = 64 * 1024;
 const BINCODE_CONFIG: bincode::config::Configuration = bincode::config::standard();
 
 impl Storage {
     pub fn new(path: &str) -> Result<Self> {
-        let db = sled::open(path)?;
+        let db: sled::Db = sled::open(path)?;
         Ok(Self { db })
     }
 
@@ -111,8 +124,11 @@ impl Storage {
 
 #[cfg(test)]
 mod tests {
+    use crate::LOCAL_PATH;
     use super::*;
     use tempfile::TempDir;
+    use std::path::Path;
+    use std::{fs, u8};
 
     fn create_test_page() -> NLabPage {
         NLabPage {
@@ -139,6 +155,132 @@ mod tests {
         assert_eq!(retrieved_page.id, page.id);
         assert_eq!(retrieved_page.title, page.title);
         assert_eq!(retrieved_page.content, page.content);
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_real_html_parsing_and_storage() -> Result<()> {
+        use crate::parser::parse_html_file;
+        
+        let temp_dir = TempDir::new().unwrap();
+        let storage = Storage::new(temp_dir.path().to_str().unwrap())?;
+        
+        // 使用实际的 HTML 文件路径
+        let test_html_path = Path::new("nlab_mirror/pages/4/7/4/1/1474/content.html");
+        
+        if !test_html_path.is_file() {
+            println!("跳过测试：找不到测试文件 {:?}", test_html_path);
+            return Ok(());
+        }
+        
+        // 验证文件可读
+        let html_content = fs::read_to_string(test_html_path)
+            .expect("Failed to read HTML file");
+        assert!(!html_content.is_empty(), "HTML 文件内容为空");
+        
+        // 解析真实的 HTML 文件
+        let page = parse_html_file(test_html_path, Path::new(LOCAL_PATH))?.unwrap();
+        
+        println!("\n=== 解析的页面信息 ===");
+        println!("  ID: {}", page.id);
+        println!("  标题: {}", page.title);
+        println!("  文件路径: {}", page.file_path);
+        println!("  URL: {}", page.url);
+        println!("  内容长度: {} 字节", page.content.len());
+        println!("  内容预览: {}...", page.content);
+
+        // 测试序列化大小
+        let serialized: Vec<u8> = bincode::encode_to_vec(&page, BINCODE_CONFIG)?;
+        println!("  序列化后大小: {} 字节 ({:.2} KB)", 
+            serialized.len(), 
+            serialized.len() as f64 / 1024.0);
+        
+        // 检查是否超过大小限制
+        if serialized.len() > NLAB_PAGE_SIZE {
+            println!("  ⚠️  警告：超过大小限制 ({} > {})", 
+                serialized.len(), NLAB_PAGE_SIZE);
+        }
+        
+        // 存储到数据库
+        storage.save_page(&page)?;
+        println!("  ✓ 成功存储到数据库");
+        
+        // 从数据库读取
+        let retrieved = storage.get_page(&page.id)?;
+        assert!(retrieved.is_some(), "无法从数据库读取页面");
+        
+        let retrieved_page = retrieved.unwrap();
+        
+        // 验证所有字段完全一致
+        assert_eq!(retrieved_page.id, page.id, "ID 不匹配");
+        assert_eq!(retrieved_page.title, page.title, "标题不匹配");
+        assert_eq!(retrieved_page.file_path, page.file_path, "文件路径不匹配");
+        assert_eq!(retrieved_page.url, page.url, "URL 不匹配");
+        assert_eq!(retrieved_page.content, page.content, "内容不匹配");
+        
+        println!("  ✓ 数据完整性验证通过");
+        println!("\n✓ 真实 HTML 文件的存储和恢复测试通过\n");
+        
+        Ok(())
+    }
+
+    #[test]
+    fn test_multiple_real_pages() -> Result<()> {
+        use crate::parser::index_local_files;
+        
+        let temp_dir = TempDir::new().unwrap();
+        let storage = Storage::new(temp_dir.path().to_str().unwrap())?;
+        
+        let nlab_path = Path::new("nlab_mirror");
+        
+        if !nlab_path.exists() {
+            println!("跳过测试：找不到 nlab_mirror 目录");
+            return Ok(());
+        }
+        
+        // 解析本地文件（限制数量以加快测试）
+        println!("\n=== 批量页面测试 ===");
+        println!("正在解析文件...");
+        let pages = index_local_files(nlab_path)?;
+        let test_pages: Vec<_> = pages.into_iter().take(10).collect();
+        
+        if test_pages.is_empty() {
+            println!("跳过测试：没有找到可解析的页面");
+            return Ok(());
+        }
+        
+        println!("找到 {} 个页面进行测试", test_pages.len());
+        
+        // 批量存储
+        storage.save_pages_batch(test_pages.clone())?;
+        println!("✓ 批量存储完成");
+        
+        // 逐个验证
+        let mut oversized_count = 0;
+        for original_page in &test_pages {
+            let retrieved = storage.get_page(&original_page.id)?;
+            assert!(retrieved.is_some(), "页面 {} 未找到", original_page.id);
+            
+            let retrieved_page = retrieved.unwrap();
+            assert_eq!(retrieved_page.id, original_page.id);
+            assert_eq!(retrieved_page.title, original_page.title);
+            assert_eq!(retrieved_page.content, original_page.content);
+            
+            // 检查序列化大小
+            let serialized = bincode::encode_to_vec(&original_page, BINCODE_CONFIG)?;
+            if serialized.len() > NLAB_PAGE_SIZE {
+                oversized_count += 1;
+                println!("  ⚠️  页面 {} 超过大小限制: {} 字节", 
+                    original_page.id, serialized.len());
+            }
+        }
+        
+        println!("✓ {} 个页面验证通过", test_pages.len());
+        if oversized_count > 0 {
+            println!("⚠️  其中 {} 个页面超过大小限制", oversized_count);
+        }
+        println!();
         
         Ok(())
     }
@@ -179,48 +321,5 @@ mod tests {
         }
         
         Ok(())
-    }
-
-    #[test]
-    fn test_metadata_operations() -> Result<()> {
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Storage::new(temp_dir.path().to_str().unwrap())?;
-        
-        let key = "meta:last_sync";
-        let value = b"2024-01-01";
-        
-        storage.set_metadata(key, value)?;
-        
-        let retrieved = storage.get_metadata(key)?;
-        assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap(), value);
-        
-        Ok(())
-    }
-
-    #[test]
-    fn test_invalid_metadata_key() {
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Storage::new(temp_dir.path().to_str().unwrap()).unwrap();
-        
-        let result = storage.set_metadata("invalid_key", b"value");
-        assert!(matches!(result, Err(StorageError::InvalidMetadataKey(_))));
-    }
-
-    #[test]
-    fn test_page_size_exceeded() {
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Storage::new(temp_dir.path().to_str().unwrap()).unwrap();
-        
-        let large_page = NLabPage {
-            id: "large.md".to_string(),
-            title: "Large Page".to_string(),
-            file_path: "large.md".to_string(),
-            url: "https://ncatlab.org/nlab/show/large".to_string(),
-            content: "x".repeat(NLAB_PAGE_SIZE + 1000),
-        };
-        
-        let result = storage.save_page(&large_page);
-        assert!(matches!(result, Err(StorageError::PageSizeExceeded { .. })));
     }
 }

@@ -78,7 +78,7 @@ pub fn index_local_files(repo_path: &Path) -> Result<Vec<NLabPage>, ParseHtmlErr
     Ok(pages)
 }
 
-fn parse_html_file(file_path: &Path, repo_path: &Path) -> Result<Option<NLabPage>, ParseHtmlError> {
+pub fn parse_html_file(file_path: &Path, repo_path: &Path) -> Result<Option<NLabPage>, ParseHtmlError> {
     let relative_path = file_path
         .strip_prefix(repo_path)?
         .to_string_lossy()
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_extract_one_url_and_open_in_browser() {
-        let path = Path::new("nlab_mirror/pages/0/0/0/0/10000/content.html");
+        let path = Path::new("nlab_mirror/pages/7/0/2/0/10207/content.html");
 
         if path.is_file() {
             let html_content = fs::read_to_string(path).expect("Failed to read HTML file");
