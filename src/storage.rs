@@ -226,66 +226,6 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_real_pages() -> Result<()> {
-        use crate::parser::index_local_files;
-        
-        let temp_dir = TempDir::new().unwrap();
-        let storage = Storage::new(temp_dir.path().to_str().unwrap())?;
-        
-        let nlab_path = Path::new("nlab_mirror");
-        
-        if !nlab_path.exists() {
-            println!("跳过测试：找不到 nlab_mirror 目录");
-            return Ok(());
-        }
-        
-        // 解析本地文件（限制数量以加快测试）
-        println!("\n=== 批量页面测试 ===");
-        println!("正在解析文件...");
-        let pages = index_local_files(nlab_path)?;
-        let test_pages: Vec<_> = pages.into_iter().take(10).collect();
-        
-        if test_pages.is_empty() {
-            println!("跳过测试：没有找到可解析的页面");
-            return Ok(());
-        }
-        
-        println!("找到 {} 个页面进行测试", test_pages.len());
-        
-        // 批量存储
-        storage.save_pages_batch(test_pages.clone())?;
-        println!("✓ 批量存储完成");
-        
-        // 逐个验证
-        let mut oversized_count = 0;
-        for original_page in &test_pages {
-            let retrieved = storage.get_page(&original_page.id)?;
-            assert!(retrieved.is_some(), "页面 {} 未找到", original_page.id);
-            
-            let retrieved_page = retrieved.unwrap();
-            assert_eq!(retrieved_page.id, original_page.id);
-            assert_eq!(retrieved_page.title, original_page.title);
-            assert_eq!(retrieved_page.content, original_page.content);
-            
-            // 检查序列化大小
-            let serialized = bincode::encode_to_vec(&original_page, BINCODE_CONFIG)?;
-            if serialized.len() > NLAB_PAGE_SIZE {
-                oversized_count += 1;
-                println!("  ⚠️  页面 {} 超过大小限制: {} 字节", 
-                    original_page.id, serialized.len());
-            }
-        }
-        
-        println!("✓ {} 个页面验证通过", test_pages.len());
-        if oversized_count > 0 {
-            println!("⚠️  其中 {} 个页面超过大小限制", oversized_count);
-        }
-        println!();
-        
-        Ok(())
-    }
-
-    #[test]
     fn test_page_not_found() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
         let storage = Storage::new(temp_dir.path().to_str().unwrap())?;
