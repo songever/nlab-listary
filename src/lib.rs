@@ -5,3 +5,4 @@ pub mod git_ops;
 pub mod models;
 pub mod parser;
 pub mod browser;
+pub mod storage;

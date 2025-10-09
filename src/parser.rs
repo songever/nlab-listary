@@ -99,12 +99,7 @@ fn parse_html_file(file_path: &Path, repo_path: &Path) -> Result<Option<NLabPage
 
     let url = extract_url(&document)?;
 
-    Ok(Some(NLabPage {
-        file_path: relative_path,
-        url,
-        title,
-        content,
-    }))
+    Ok(Some(NLabPage::new(relative_path, title, url, content)))
 }
 
 fn extract_title(document: &Html) -> String {
