@@ -1,7 +1,10 @@
+
 use crate::models::NLabPage;
+use rayon::prelude::*;
 use scraper::{Html, Selector};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use thiserror::Error;
 use walkdir::WalkDir;
 
@@ -35,34 +38,43 @@ pub enum ParseHtmlError {
 
 pub fn index_local_files(repo_path: &Path) -> Result<Vec<NLabPage>, ParseHtmlError> {
     println!("\n--- 开始遍历和解析本地文件 ---");
-    let mut pages: Vec<NLabPage> = Vec::new();
-    let mut parsed_count = 0;
-    let mut skipped_count = 0;
-    let mut skipped_files: Vec<(PathBuf, ParseHtmlError)> = Vec::new();
+    
+    // 先收集所有HTML文件路径
+    let html_files: Vec<PathBuf> = WalkDir::new(repo_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let path = e.path();
+            path.is_file() && path.extension().map_or(false, |ext| ext == "html")
+        })
+        .map(|e| e.path().to_path_buf())
+        .collect();
 
-    // 使用 WalkDir 遍历目录
-    for entry in WalkDir::new(repo_path).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
+    let total_files = html_files.len();
+    println!("找到 {} 个HTML文件", total_files);
 
-        // 过滤出 .html 文件
-        if path.is_file() && path.extension().map_or(false, |ext| ext == "html") {
+    // 使用 Mutex 来安全地收集错误信息
+    let skipped_files = Mutex::new(Vec::new());
+    
+    // 并行处理所有文件
+    let pages: Vec<NLabPage> = html_files
+        .par_iter()
+        .filter_map(|path| {
             match parse_html_file(path, repo_path) {
-                Ok(Some(page)) => {
-                    pages.push(page);
-                    parsed_count += 1;
-                }
-                Ok(None) => {
-                    // 文件被解析但返回 None（如果需要这种情况）
-                }
+                Ok(Some(page)) => Some(page),
+                Ok(None) => None,
                 Err(e) => {
-                    // 记录错误但继续处理其他文件
-                    skipped_count += 1;
-                    skipped_files.push((path.to_path_buf(), e));
                     eprintln!("⚠ Skipping file due to error: {}", path.display());
+                    skipped_files.lock().unwrap().push((path.clone(), e));
+                    None
                 }
             }
-        }
-    }
+        })
+        .collect();
+
+    let skipped = skipped_files.into_inner().unwrap();
+    let parsed_count = pages.len();
+    let skipped_count = skipped.len();
 
     println!("--- 解析完成! ---");
     println!("成功处理: {} 个文件", parsed_count);
@@ -70,7 +82,7 @@ pub fn index_local_files(repo_path: &Path) -> Result<Vec<NLabPage>, ParseHtmlErr
     if skipped_count > 0 {
         println!("跳过: {skipped_count} 个文件\n");
         println!("跳过的文件列表:");
-        for (path, error) in &skipped_files {
+        for (path, error) in &skipped {
             println!("  - {}: {}", path.display(), error);
         }
     }
@@ -154,7 +166,7 @@ fn extract_url(document: &Html) -> Result<String, ParseHtmlError> {
         .ok_or_else(|| ParseHtmlError::UnexpectedHrefFormat(href.to_string()))?;
 
     let full_url = format!("{}{}", base_url, page_name);
-    println!("URL:  {}", full_url);
+    // println!("URL:  {}", full_url);
     Ok(full_url)
 }
 

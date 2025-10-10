@@ -898,6 +898,7 @@ dependencies = [
  "bincode",
  "git2",
  "open",
+ "rayon",
  "scraper",
  "serde",
  "sled",
