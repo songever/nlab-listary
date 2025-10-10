@@ -41,7 +41,6 @@ pub struct Storage {
     db: sled::Db,
 }
 
-const NLAB_PAGE_SIZE: usize = 64 * 1024;
 const BINCODE_CONFIG: bincode::config::Configuration = bincode::config::standard();
 
 impl Storage {
@@ -128,6 +127,8 @@ mod tests {
     use std::path::Path;
     use std::{fs, u8};
     use tempfile::TempDir;
+
+    const NLAB_PAGE_SIZE: usize = 64 * 1024;
 
     fn create_test_page() -> NLabPage {
         NLabPage {

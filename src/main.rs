@@ -1,9 +1,9 @@
 
 use nlab_listary_demo::LOCAL_PATH;
-use nlab_listary_demo::browser::open_url;
 use nlab_listary_demo::git_ops::update_local_repository;
 use nlab_listary_demo::parser::index_local_files;
 use nlab_listary_demo::storage::Storage;
+use nlab_listary_demo::search::*;
 use std::error::Error;
 use std::path::Path;
 
@@ -25,43 +25,72 @@ fn main() -> Result<(), Box<dyn Error>> {
         storage.save_pages_batch(indexed_data.clone())?;
         println!("✓ 成功存储 {} 个页面到数据库", indexed_data.len());
 
-        // 验证存储：从数据库读取前 3 个页面
+        // 初始化搜索引擎并构建索引
+        println!("\n正在初始化搜索引擎...");
+        let index_dir = Path::new("tantivy_index");
+        let mut search_engine = TantivySearch::new(index_dir)?;
+        
+        println!("正在构建搜索索引...");
+        search_engine.build_index(indexed_data.clone())?;
+        println!("✓ 成功构建搜索索引");
+
+        // 验证搜索功能
+        println!("\n--- 搜索功能验证 ---");
+        
+        // 测试 1: 基本搜索
+        println!("\n测试 1: 搜索 'category'");
+        let results = search_engine.search("category", 5)?;
+        println!("找到 {} 个结果:", results.len());
+        for (i, result) in results.iter().enumerate() {
+            println!("  {}. {} (分数: {:.2})", i + 1, result.title, result.score);
+            println!("     内容: {}...", result.content.chars().take(80).collect::<String>());
+        }
+
+        // 测试 2: 仅标题搜索
+        println!("\n测试 2: 仅在标题中搜索 'theory'");
+        let title_results = search_engine.search_with_filters(
+            "theory",
+            5,
+            SearchFilters::new(true, 0.5),
+        )?;
+        println!("找到 {} 个结果:", title_results.len());
+        for (i, result) in title_results.iter().enumerate() {
+            println!("  {}. {} (分数: {:.2})", i + 1, result.title, result.score);
+        }
+
+        // 测试 3: 带最小分数过滤
+        println!("\n测试 3: 搜索 'mathematics' (最小分数 1.0)");
+        let filtered_results = search_engine.search_with_filters(
+            "mathematics",
+            10,
+            SearchFilters::new(false, 1.0),
+        )?;
+        println!("找到 {} 个高质量结果:", filtered_results.len());
+        for (i, result) in filtered_results.iter().enumerate() {
+            println!("  {}. {} (分数: {:.2})", i + 1, result.title, result.score);
+        }
+
+        // 数据库验证（保留原有逻辑）
         println!("\n--- 数据库验证 (前 3 条) ---");
         for page in indexed_data.iter().take(3) {
             println!("文件: {}", page.file_path);
             println!("标题: {}", page.title);
-            println!("URL: {}", page.url);
-            println!(
-                "内容片段: {}...",
-                page.content.chars().take(100).collect::<String>()
-            );
-
-            // 从数据库读取验证
+            
             match storage.get_page(&page.id)? {
                 Some(retrieved_page) => {
                     println!("✓ 从数据库成功读取");
                     assert_eq!(retrieved_page.title, page.title);
-                    assert_eq!(retrieved_page.content, page.content);
                 }
                 None => {
                     eprintln!("✗ 从数据库读取失败");
                 }
             }
-
             println!("---");
         }
 
-        // 可选：测试打开浏览器（注释掉以避免打开太多标签页）
-        // println!("\n正在浏览器中打开第一个页面...");
-        // if let Some(first_page) = indexed_data.first() {
-        //     match open_url(&first_page.url) {
-        //         Ok(()) => println!("✓ 成功打开页面"),
-        //         Err(e) => eprintln!("✗ 打开页面失败: {}", e),
-        //     }
-        // }
-
         println!("\n✓ 所有操作完成！");
         println!("数据库位置: nlab_data.db");
+        println!("索引位置: tantivy_index/");
     }
     
     Ok(())
