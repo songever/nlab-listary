@@ -57,12 +57,12 @@ impl Storage {
         // 先计算实际大小，避免固定大小数组的浪费
         let serialized: Vec<u8> = bincode::encode_to_vec(page, BINCODE_CONFIG)?;
 
-        if serialized.len() > NLAB_PAGE_SIZE {
-            return Err(StorageError::PageSizeExceeded {
-                actual: serialized.len(),
-                max: NLAB_PAGE_SIZE,
-            });
-        }
+        // if serialized.len() > NLAB_PAGE_SIZE {
+        //     return Err(StorageError::PageSizeExceeded {
+        //         actual: serialized.len(),
+        //         max: NLAB_PAGE_SIZE,
+        //     });
+        // }
 
         self.db.insert(page.id.as_bytes(), serialized)?;
         Ok(())
@@ -86,12 +86,12 @@ impl Storage {
         for page in pages {
             let serialized: Vec<u8> = bincode::encode_to_vec(&page, BINCODE_CONFIG)?;
 
-            if serialized.len() > NLAB_PAGE_SIZE {
-                return Err(StorageError::PageSizeExceeded {
-                    actual: serialized.len(),
-                    max: NLAB_PAGE_SIZE,
-                });
-            }
+            // if serialized.len() > NLAB_PAGE_SIZE {
+            //     return Err(StorageError::PageSizeExceeded {
+            //         actual: serialized.len(),
+            //         max: NLAB_PAGE_SIZE,
+            //     });
+            // }
 
             batch.insert(page.id.as_bytes(), serialized);
         }
