@@ -63,19 +63,19 @@ fn sync_local_repo(state: State<AppState>) -> Result<(), String> {
     use std::path::Path;
     let path = Path::new(GIT_REPO_PATH);
     let mut state = state.lock().unwrap();
-    
-    update_local_repository(path)
-        .map_err(|e| format!("Syncronizing local repo failed: {}", e))?;
-    
-    let pages = index_local_files(path)
-        .map_err(|e| format!("Parsing htmls failed: {}", e))?;
+
+    update_local_repository(path).map_err(|e| format!("Syncronizing local repo failed: {}", e))?;
+
+    let pages = index_local_files(path).map_err(|e| format!("Parsing htmls failed: {}", e))?;
 
     state
         .storage
         .save_pages_batch(&pages)
         .map_err(|e| format!("Saving pages to storage failed: {}", e))?;
 
-    pages.iter().try_for_each(|page| state.search_engine.update_page(page))
+    pages
+        .iter()
+        .try_for_each(|page| state.search_engine.update_page(page))
         .map_err(|e| format!("Building search index failed: {}", e))?;
     Ok(())
 }
@@ -99,7 +99,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(app_state)
-        .invoke_handler(tauri::generate_handler![sync_local_repo, get_search_results, open_url])
+        .invoke_handler(tauri::generate_handler![
+            sync_local_repo,
+            get_search_results,
+            open_url
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -126,4 +130,3 @@ fn initialize_app_state() -> Result<AppState, Box<dyn std::error::Error>> {
         Ok(Mutex::new(AppStateInner::new(search_engine, storage)))
     }
 }
-

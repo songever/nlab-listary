@@ -1,11 +1,12 @@
 [application]
 name = "nlab-listary-ui"
-default_platform = "web"
+default_platform = "desktop"
+platform = "desktop"
 out_dir = "dist"
 asset_dir = "assets"
 
 [web.app]
-title = "Tauri + Dioxus App"
+title = "Nlab Listary"
 
 [web.watcher]
 reload_html = true

@@ -34,15 +34,4 @@ tempfile = "3.23.0"
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
-[profile]
-
-[profile.wasm-dev]
-inherits = "dev"
-opt-level = 1
-
-[profile.server-dev]
-inherits = "dev"
-
-[profile.android-dev]
-inherits = "dev"
 # tokio = { version = "1.47.1", features = ["full"] }
