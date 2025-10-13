@@ -1,0 +1,5 @@
+/target
+/nlab_mirror
+/tantivy_index
+*.git
+*.db
