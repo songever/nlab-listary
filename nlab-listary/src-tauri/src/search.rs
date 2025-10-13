@@ -64,7 +64,6 @@ impl Default for SearchFilters {
     }
 }
 
-
 // 辅助方法：创建 schema
 fn create_schema() -> tantivy::schema::Schema {
     let mut schema_builder = tantivy::schema::Schema::builder();
@@ -90,7 +89,7 @@ impl SearchEngine for TantivySearch {
         Ok(TantivySearch { index, reader })
     }
 
-    fn build_index(&mut self, docs:&[NLabPage]) -> Result<(), SearchError> {
+    fn build_index(&mut self, docs: &[NLabPage]) -> Result<(), SearchError> {
         let schema = self.index.schema();
         let page_id = schema.get_field("id").unwrap();
         let page_title = schema.get_field("title").unwrap();
