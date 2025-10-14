@@ -5,9 +5,8 @@ platform = "desktop"
 out_dir = "dist"
 asset_dir = "assets"
 
-[web.app]
-title = "Nlab Listary"
+[bundle]
+identifier = "com.nlab.listary"
+publisher = "songever"
+icon = ["src-tauri/icons/icon.png"]
 
-[web.watcher]
-reload_html = true
-watch_path = ["src", "assets"]

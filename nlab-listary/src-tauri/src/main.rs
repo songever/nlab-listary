@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    nlab_listary_lib::run()
+    nlab_listary_ui::run()
 }

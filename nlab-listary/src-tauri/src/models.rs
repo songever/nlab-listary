@@ -1,6 +1,6 @@
 use bincode::{Decode, Encode};
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq)]
 pub struct SearchIndex {
     pub title: String,
     pub url: String,

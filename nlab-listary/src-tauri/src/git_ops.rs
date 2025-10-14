@@ -10,6 +10,13 @@ pub fn update_local_repository(path: &Path) -> Result<Repository, git2::Error> {
         println!("本地仓库已存在，正在更新...");
         let repo = Repository::open(path)?;
 
+        // 检查是否有有效的 HEAD
+        if repo.head().is_err() {
+            println!("仓库状态异常，重新初始化...");
+            std::fs::remove_dir_all(path).ok();
+            return clone_with_progress(REPO_URL, path);
+        }
+
         // 1. 执行 FETCH (获取远程最新状态)
         fetch_repo(&repo)?;
 
@@ -52,6 +59,17 @@ pub fn clone_with_progress(url: &str, path: &Path) -> Result<Repository, git2::E
         true
     });
 
+    callbacks.transfer_progress(|stats| {
+        if stats.received_objects() == stats.total_objects() {
+            print!("\rAnalysising: {}/{}",stats.indexed_objects(), stats.total_objects());
+        } else {
+            print!("\rReceiving: {}/{} ({:.2} MB)", stats.received_objects(), stats.total_objects(),
+                    stats.received_bytes() as f64 / 1024.0 / 1024.0);
+        }
+        std::io::stdout().flush().unwrap();
+        true
+    });
+
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks);
 
@@ -75,16 +93,7 @@ pub fn clone_with_progress(url: &str, path: &Path) -> Result<Repository, git2::E
     builder.with_checkout(checkout_options);
 
     let repo = builder.clone(url, path)?;
-
-    // 确保克隆后处于健康的分支状态
-    {
-        // 找到远程 HEAD 指向的提交
-        let head_commit = repo.head()?.peel_to_commit()?;
-        // 在该提交上创建本地 'master' 分支
-        repo.branch("master", &head_commit, false)?;
-        // 将 HEAD 指向新创建的 'master' 分支
-        repo.set_head("refs/heads/master")?;
-    }
+    println!("\n克隆完成");
 
     Ok(repo)
 }
@@ -100,6 +109,20 @@ fn fetch_repo(repo: &Repository) -> Result<(), git2::Error> {
         true
     });
 
+    callbacks.transfer_progress(|stats| {
+        if stats.received_objects() == stats.total_objects() {
+            print!("\r解析对象: {}/{}", stats.indexed_objects(), stats.total_objects());
+        } else {
+            print!("\r接收对象: {}/{} ({:.2} MB)", 
+                stats.received_objects(), 
+                stats.total_objects(),
+                stats.received_bytes() as f64 / 1024.0 / 1024.0
+            );
+        }
+        std::io::stdout().flush().unwrap();
+        true
+    });
+    
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks);
 
