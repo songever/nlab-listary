@@ -1,12 +1,19 @@
-
-#![allow(non_snake_case)]
-
+use wasm_bindgen::prelude::*;
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 
 static CSS: Asset = asset!("/assets/styles.css");
 static TAURI_ICON: Asset = asset!("/assets/tauri.svg");
 static DIOXUS_ICON: Asset = asset!("/assets/dioxus.png");
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"] )]
+    async fn invoke(cmd: &str, args: JsValue) -> JsValue;
+
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"], js_name = "invoke" )]
+    async fn invoke_without_args(cmd: &str) -> JsValue;
+}
 
 #[derive(Serialize, Deserialize)]
 struct SearchArgs {
@@ -39,9 +46,18 @@ async fn get_search_results(query: &str) -> Result<Vec<SearchIndex>, String> {
     ])
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct OpenArgs {
+    url: String,
+}
+
 async fn open_url(url: &str) {
     // TODO: Implement Tauri backend integration
-    println!("Would open URL: {}", url);
+    let args = serde_wasm_bindgen::to_value(&OpenArgs { url: url.to_string() }).unwrap();
+    let ret =  invoke("open_url",args).await;
+    if let Some(err) = ret.as_string() {
+        eprintln!("Error opening URL: {}", err);
+    };
 }
 
 pub fn App() -> Element {

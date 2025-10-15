@@ -1,8 +1,7 @@
 [application]
 name = "nlab-listary-ui"
-default_platform = "desktop"
-platform = "desktop"
-out_dir = "dist"
+default_platform = "web"
+out_dir = "target/dx/nlab-listary-ui/debug/web/public"
 asset_dir = "assets"
 
 [bundle]

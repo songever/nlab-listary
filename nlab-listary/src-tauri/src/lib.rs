@@ -1,13 +1,13 @@
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 use crate::parser::index_local_files;
 use crate::{git_ops::update_local_repository, models::SearchIndex, search::SearchEngine};
-use tauri::State;
+use tauri::{Emitter, State};
 
 pub const REPO_URL: &str = "https://github.com/ncatlab/nlab-content-html.git";
 pub const GIT_REPO_PATH: &str = "nlab_mirror";
 pub const DB_PATH: &str = "nlab_page_data.db";
-pub const INDEX_PATH: &str = "nlab_pagr_index";
+pub const INDEX_PATH: &str = "nlab_page_index";
 
 mod browser;
 mod git_ops;
@@ -97,7 +97,6 @@ fn is_ready(state: State<AppState>) -> Result<bool, String> {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_state = Arc::new(RwLock::new(AppStateInner {
         search_engine: None,
@@ -114,18 +113,23 @@ pub fn run() {
             open_url,
             is_ready
         ])
-        .setup(move |_app| {
+        .setup(move |app| {
+            let app_handle = app.handle().clone();
             std::thread::spawn(move || {
                 eprintln!("initializing ...");
-                match initialize_components() {
+                let _ = app_handle.emit("init-status", "正在初始化...");
+                
+                match initialize_components(&app_handle) {
                     Ok((search_engine, storage)) => {
                         let mut state = state_clone.write().unwrap();
                         state.search_engine = Some(search_engine);
                         state.storage = Some(storage);
                         eprintln!("initialized successfully");
+                        let _ = app_handle.emit("init-complete", true);
                     }
                     Err(e) => {
                         eprintln!("failed to initialize app state: {}", e);
+                        let _ = app_handle.emit("init-error", format!("{}", e));
                     }
                 }
             });
@@ -136,22 +140,26 @@ pub fn run() {
 }
 
 fn initialize_components(
+    app_handle: &tauri::AppHandle,
 ) -> Result<(search::TantivySearch, storage::Storage), Box<dyn std::error::Error>> {
     use std::path::Path;
     let path = Path::new(GIT_REPO_PATH);
+    
+    let _ = app_handle.emit("init-status", "正在同步仓库...");
     let _repo = update_local_repository(path)?;
 
     if !path.exists() {
         Err("local repo should exist after update".into())
     } else {
+        let _ = app_handle.emit("init-status", "正在解析页面...");
         let pages = index_local_files(path)?;
 
-        // 1. 初始化存储
+        let _ = app_handle.emit("init-status", "正在初始化存储...");
         let storage_path = Path::new(DB_PATH).join("storage");
         let storage = storage::Storage::new(storage_path.to_str().unwrap())?;
         storage.save_pages_batch(&pages)?;
 
-        // 2. 初始化搜索引擎
+        let _ = app_handle.emit("init-status", "正在构建搜索索引...");
         let index_path = Path::new(INDEX_PATH).join("index");
         let mut search_engine = search::TantivySearch::new(index_path.to_str().unwrap())?;
         search_engine.build_index(&pages)?;

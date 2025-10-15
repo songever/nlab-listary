@@ -4,9 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.nlab.listary",
   "build": {
-    "beforeDevCommand": "",
+    "beforeDevCommand": "dx serve --port 8080",
     "beforeBuildCommand": "dx build --release",
-    "frontendDist": "../target/dx/nlab-listary-ui/release/linux/app"
+    "devUrl": "http://localhost:8080",
+    "frontendDist": "../target/dx/nlab-listary-ui/debug/web/public"
   },
   "app": {
     "withGlobalTauri": true,
