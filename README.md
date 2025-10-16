@@ -1,7 +1,7 @@
 # nlab-listary-demo
 ### Project Structure(so far)：
 ```
-    ./src
+    ./nlab-listary/src-tauri/src
     ├── browser.rs
     ├── git_ops.rs
     ├── lib.rs
