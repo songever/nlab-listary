@@ -118,7 +118,7 @@ pub fn run() {
             std::thread::spawn(move || {
                 eprintln!("initializing ...");
                 let _ = app_handle.emit("init-status", "正在初始化...");
-                
+
                 match initialize_components(&app_handle) {
                     Ok((search_engine, storage)) => {
                         let mut state = state_clone.write().unwrap();
@@ -144,7 +144,7 @@ fn initialize_components(
 ) -> Result<(search::TantivySearch, storage::Storage), Box<dyn std::error::Error>> {
     use std::path::Path;
     let path = Path::new(GIT_REPO_PATH);
-    
+
     let _ = app_handle.emit("init-status", "正在同步仓库...");
     let _repo = update_local_repository(path)?;
 

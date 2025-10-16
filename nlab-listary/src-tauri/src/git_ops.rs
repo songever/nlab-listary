@@ -61,10 +61,18 @@ pub fn clone_with_progress(url: &str, path: &Path) -> Result<Repository, git2::E
 
     callbacks.transfer_progress(|stats| {
         if stats.received_objects() == stats.total_objects() {
-            print!("\rAnalysising: {}/{}",stats.indexed_objects(), stats.total_objects());
+            print!(
+                "\rAnalysising: {}/{}",
+                stats.indexed_objects(),
+                stats.total_objects()
+            );
         } else {
-            print!("\rReceiving: {}/{} ({:.2} MB)", stats.received_objects(), stats.total_objects(),
-                    stats.received_bytes() as f64 / 1024.0 / 1024.0);
+            print!(
+                "\rReceiving: {}/{} ({:.2} MB)",
+                stats.received_objects(),
+                stats.total_objects(),
+                stats.received_bytes() as f64 / 1024.0 / 1024.0
+            );
         }
         std::io::stdout().flush().unwrap();
         true
@@ -111,10 +119,15 @@ fn fetch_repo(repo: &Repository) -> Result<(), git2::Error> {
 
     callbacks.transfer_progress(|stats| {
         if stats.received_objects() == stats.total_objects() {
-            print!("\r解析对象: {}/{}", stats.indexed_objects(), stats.total_objects());
+            print!(
+                "\r解析对象: {}/{}",
+                stats.indexed_objects(),
+                stats.total_objects()
+            );
         } else {
-            print!("\r接收对象: {}/{} ({:.2} MB)", 
-                stats.received_objects(), 
+            print!(
+                "\r接收对象: {}/{} ({:.2} MB)",
+                stats.received_objects(),
                 stats.total_objects(),
                 stats.received_bytes() as f64 / 1024.0 / 1024.0
             );
@@ -122,7 +135,7 @@ fn fetch_repo(repo: &Repository) -> Result<(), git2::Error> {
         std::io::stdout().flush().unwrap();
         true
     });
-    
+
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks);
 
