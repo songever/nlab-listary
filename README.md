@@ -6,14 +6,18 @@ make sure you have set the Tauri and Dioxus platform in your system, then run
 ```
 cargo tauri dev
 ```
-to build and examine the project  
-If you have something lacked please check https://tauri.app/start/prerequisites/  
+to build and examine the project.  
+If you have something lacked please check https://tauri.app/start/prerequisites/.  
 
 To open the browser in wsl, install wslu:  
 ```
 apt install -y wslu
 ```
-The first running process would take a long time, you should wait a few minutes for cloning the git repo
+
+#### A brief description
+The local index syncronize the data by cloning the official repo storing (maybe)all of the pages of the nlab-wiki.  
+The first running process would take a long time, you should wait a few minutes for cloning the git repo.  
+And you should prepare about 2GB spaces for the git repo.  
 
 ---
 ### Project Structure(so far)：
