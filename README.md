@@ -7,6 +7,7 @@ Insure you have set the Tauri and Dioxus platform in your system, then run
 cargo tauri dev
 ```
 to build and examine the project  
+The initialization process would take a long time.
 
 ---
 ### Project Structure(so far)：
