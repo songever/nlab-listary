@@ -3,5 +3,6 @@
 /tantivy_index
 /nlab_page_data.db
 /nlab_page_index
+./main.rs
 *.git
 *.db

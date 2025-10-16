@@ -25,14 +25,14 @@ impl NLabPage {
     /// 从文件路径创建 ID
     pub fn new(file_path: String, title: String, url: String, content: String) -> Self {
         Self {
-            id: file_path.clone(),
+            id: title.clone(),
             title,
             file_path,
             url,
             content,
         }
     }
-
+    
     pub fn id_from_url(url: &str) -> Option<String> {
         url.split("/show/").nth(1).map(|s| s.to_string())
     }

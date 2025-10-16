@@ -1,3 +1,4 @@
+
 use std::sync::{Arc, RwLock};
 
 use crate::parser::index_local_files;
@@ -59,33 +60,60 @@ fn get_search_results(state: State<AppState>, query: String) -> Result<Vec<Searc
     Ok(search_results)
 }
 
-#[cfg(ignore)]
+#[cfg(feature = "ignore")]
 #[tauri::command]
 fn sync_local_repo(state: State<AppState>) -> Result<(), String> {
     use std::path::Path;
     let path = Path::new(GIT_REPO_PATH);
-    let mut state = state.lock().unwrap();
+    
+    let mut state = state
+        .write()
+        .map_err(|e| format!("failed to lock state: {}", e))?;
 
-    update_local_repository(path).map_err(|e| format!("Syncronizing local repo failed: {}", e))?;
+    update_local_repository(path)
+        .map_err(|e| format!("Synchronizing local repo failed: {}", e))?;
 
-    let pages = index_local_files(path).map_err(|e| format!("Parsing htmls failed: {}", e))?;
+    let pages = index_local_files(path)
+        .map_err(|e| format!("Parsing htmls failed: {}", e))?;
 
-    state
+    let storage = state
         .storage
+        .as_ref()
+        .ok_or_else(|| "storage is not initialized".to_string())?;
+    
+    let search_engine = state
+        .search_engine
+        .as_mut()
+        .ok_or_else(|| "search engine is not initialized".to_string())?;
+
+    storage
         .save_pages_batch(&pages)
         .map_err(|e| format!("Saving pages to storage failed: {}", e))?;
 
-    pages
-        .iter()
-        .try_for_each(|page| state.search_engine.update_page(page))
+    search_engine
+        .update_pages_batch(&pages)
         .map_err(|e| format!("Building search index failed: {}", e))?;
+    
     Ok(())
 }
 
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
     use browser::open_url;
-    open_url(&url).map_err(|e| format!("打开URL失败: {}", e))
+
+    // Validate URL format first
+    if url.is_empty() {
+        return Err("URL cannot be empty".to_string());
+    }
+
+    // Try to open the URL
+    match open_url(&url) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            eprintln!("Failed to open URL '{}': {}", url, e);
+            Err(format!("Failed to open URL: {}", e))
+        }
+    }
 }
 
 #[tauri::command]
@@ -111,13 +139,14 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_search_results,
             open_url,
-            is_ready
+            is_ready,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
+
             std::thread::spawn(move || {
                 eprintln!("initializing ...");
-                let _ = app_handle.emit("init-status", "正在初始化...");
+                let _ = app_handle.emit("init-status", "Initializing...");
 
                 match initialize_components(&app_handle) {
                     Ok((search_engine, storage)) => {
@@ -144,50 +173,39 @@ fn initialize_components(
 ) -> Result<(search::TantivySearch, storage::Storage), Box<dyn std::error::Error>> {
     use std::path::Path;
     let path = Path::new(GIT_REPO_PATH);
+    let storage_path = Path::new(DB_PATH).join("storage");
+    let index_path = Path::new(INDEX_PATH).join("index");
 
-    let _ = app_handle.emit("init-status", "正在同步仓库...");
+    let _ = app_handle.emit("init-status", "Synchronizing repository...");
     let _repo = update_local_repository(path)?;
 
     if !path.exists() {
         Err("local repo should exist after update".into())
     } else {
-        let _ = app_handle.emit("init-status", "正在解析页面...");
         let pages = index_local_files(path)?;
+        let needs_full_rebuild = !storage_path.exists() || !index_path.exists();
+        if needs_full_rebuild {
+            let _ = app_handle.emit("init-status", "Parsing pages...");
 
-        let _ = app_handle.emit("init-status", "正在初始化存储...");
-        let storage_path = Path::new(DB_PATH).join("storage");
-        let storage = storage::Storage::new(storage_path.to_str().unwrap())?;
-        storage.save_pages_batch(&pages)?;
+            let _ = app_handle.emit("init-status", "Initializing storage...");
+            let storage = storage::Storage::new(storage_path.to_str().unwrap())?;
+            storage.save_pages_batch(&pages)?;
 
-        let _ = app_handle.emit("init-status", "正在构建搜索索引...");
-        let index_path = Path::new(INDEX_PATH).join("index");
-        let mut search_engine = search::TantivySearch::new(index_path.to_str().unwrap())?;
-        search_engine.build_index(&pages)?;
+            let _ = app_handle.emit("init-status", "Building search index...");
+            let mut search_engine = search::TantivySearch::new(index_path.to_str().unwrap())?;
+            search_engine.build_index(&pages)?;
 
-        Ok((search_engine, storage))
-    }
-}
+            Ok((search_engine, storage))
+        } else {
+            let _ = app_handle.emit("init-status", "Loading existing data...");
 
-#[cfg(ignore)]
-fn initialize_app_state() -> Result<AppState, Box<dyn std::error::Error>> {
-    use std::path::Path;
-    let path = Path::new(GIT_REPO_PATH);
-    let _repo = update_local_repository(path)?;
+            let storage = storage::Storage::new(storage_path.to_str().unwrap())?;
 
-    if !path.exists() {
-        Err("local repo should ".into())
-    } else {
-        let pages = index_local_files(path)?;
+            let _ = app_handle.emit("init-status", "Checking for index updates...");
+            let mut search_engine = search::TantivySearch::new(index_path.to_str().unwrap())?;
+            search_engine.update_pages_batch(&pages)?;
 
-        // 1. 初始化存储
-        let storage_path = Path::new(DB_PATH).join("storage");
-        let storage = storage::Storage::new(storage_path.to_str().unwrap())?;
-        storage.save_pages_batch(&pages)?;
-
-        // 2. 初始化搜索引擎
-        let index_path = Path::new(INDEX_PATH).join("index");
-        let mut search_engine = search::TantivySearch::new(index_path.to_str().unwrap())?;
-        search_engine.build_index(&pages)?;
-        Ok(Mutex::new(AppStateInner::new(search_engine, storage)))
+            Ok((search_engine, storage))
+        }
     }
 }

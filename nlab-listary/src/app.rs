@@ -194,7 +194,7 @@ fn SearchResultsList(
         div { class: "results",
             if !is_ready {
                 div { class: "status-message",
-                    "⏳ Initializing..."
+                    "Initializing..."
                 }
             } else if input_value.is_empty() {
                 div { class: "status-message hint",

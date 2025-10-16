@@ -35,4 +35,7 @@ tempfile = "3.23.0"
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+default = []
+ignore = []
 # tokio = { version = "1.47.1", features = ["full"] }

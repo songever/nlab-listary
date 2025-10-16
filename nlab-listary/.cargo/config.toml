@@ -1,0 +1,4 @@
+
+[build]
+# 定义自定义 cfg 标志
+rustflags = ["--cfg", "ignore"]
