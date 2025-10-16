@@ -2,12 +2,17 @@
 ### Develop environment:
 Ubuntu 22.04  
 
-Insure you have set the Tauri and Dioxus platform in your system, then run  
+make sure you have set the Tauri and Dioxus platform in your system, then run  
 ```
 cargo tauri dev
 ```
 to build and examine the project  
-The initialization process would take a long time.
+If you have something lacked please check https://tauri.app/start/prerequisites/  
+To open the browser in wsl, install wslu:  
+```
+apt install -y wslu
+```
+The first running process would take a long time, you should wait a few minutes for cloning the git repo
 
 ---
 ### Project Structure(so far)：
