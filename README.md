@@ -1,19 +1,39 @@
 # nlab-listary-demo
+### Develop environment:
+Ubuntu 22.04  
+
+Insure you have set the Tauri and Dioxus platform in your system, then run  
+```
+cargo tauri dev
+```
+to build and examine the project  
+
+---
 ### Project Structure(so far)：
+frontend frame: Dioxus  
 ```
-    ./nlab-listary/src-tauri/src
-    ├── browser.rs
-    ├── git_ops.rs
-    ├── lib.rs
-    ├── main.rs
-    ├── models.rs
-    ├── parser.rs
-    ├── search.rs
-    └── storage.rs
+    ./nlab-listary/src  
+    ├── app.rs  
+    └── main.rs  
 ```
+backend frame: tauri  
+```
+    ./nlab-listary/src-tauri/src  
+    ├── browser.rs  
+    ├── git_ops.rs  
+    ├── lib.rs  
+    ├── main.rs  
+    ├── models.rs  
+    ├── parser.rs  
+    ├── search.rs  
+    └── storage.rs  
+```
+The git repo named **nlab_mirror** will be saved in *./nlab-listary/src-tauri*.  
+The database and search index are in the same diretory.  
+
 ---
 
-### Modules included are:  
+### Backend Modules included are:  
 Key data structures are in *models.rs*.
 
 Git fetch nlab html pages from the official remote repository to local repository using **git2** crate in *git_ops.rs*.  
