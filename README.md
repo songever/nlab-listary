@@ -8,6 +8,7 @@ cargo tauri dev
 ```
 to build and examine the project  
 If you have something lacked please check https://tauri.app/start/prerequisites/  
+
 To open the browser in wsl, install wslu:  
 ```
 apt install -y wslu
