@@ -7,7 +7,8 @@ make sure you have set the Tauri and Dioxus platform in your system, then run
 cargo tauri dev
 ```
 to build and examine the project.  
-If you have something lacked please check https://tauri.app/start/prerequisites/.  
+If you have your Tauri platform lacked please check https://tauri.app/start/prerequisites/.  
+And for your Dioxus platform lacked check https://dioxuslabs.com/learn/0.6/guide/tooling.   
 
 To open the browser in wsl, install wslu:  
 ```
